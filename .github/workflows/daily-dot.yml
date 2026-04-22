@@ -71,8 +71,11 @@ jobs:
             exit 0
           fi
 
-          # Run from /tmp (neutral dir) so Claude does not load repo context.
-          if response=$(cd /tmp && claude -p "." \
+          # Each account gets its own disposable CLAUDE_CONFIG_DIR so no
+          # state (projects, history, prefs) is shared between accounts.
+          # Running from /tmp also prevents loading repo context.
+          CFG_DIR=$(mktemp -d)
+          if response=$(cd /tmp && CLAUDE_CONFIG_DIR="${CFG_DIR}" claude -p "." \
               --model "${CLAUDE_MODEL}" \
               --max-turns 1 \
               --disallowedTools "${CLAUDE_DISALLOWED_TOOLS}" \
@@ -82,6 +85,7 @@ jobs:
             code=$?
             echo "Error (exit ${code}): ${response}" | tee -a "${LOG_FILE}"
           fi
+          rm -rf "${CFG_DIR}"
 
       - name: Send dot - Account 2
         continue-on-error: true
@@ -100,7 +104,8 @@ jobs:
             exit 0
           fi
 
-          if response=$(cd /tmp && claude -p "." \
+          CFG_DIR=$(mktemp -d)
+          if response=$(cd /tmp && CLAUDE_CONFIG_DIR="${CFG_DIR}" claude -p "." \
               --model "${CLAUDE_MODEL}" \
               --max-turns 1 \
               --disallowedTools "${CLAUDE_DISALLOWED_TOOLS}" \
@@ -110,6 +115,7 @@ jobs:
             code=$?
             echo "Error (exit ${code}): ${response}" | tee -a "${LOG_FILE}"
           fi
+          rm -rf "${CFG_DIR}"
 
       - name: Commit and push log
         run: |
