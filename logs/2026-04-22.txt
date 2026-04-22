@@ -1,0 +1,11 @@
+Date: 2026-04-22
+Time: 03:59:08 UTC
+Model: claude-haiku-4-5-20251001
+
+--- Key 1 ---
+Message sent: .
+Response: Hello! It looks like you sent just a period. How can I help you today? Feel free to ask me a question or let me know what you'd like to discuss.
+
+--- Key 2 ---
+Message sent: .
+Error: Key 2: environment variable is empty or not set
