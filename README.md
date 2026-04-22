@@ -7,7 +7,8 @@ Claude Code autenticado con OAuth. El uso cuenta contra tu suscripción Pro,
 
 Soporta hasta dos cuentas Pro en paralelo (una por secret). Cada llamada se
 ejecuta de forma independiente — si una cuenta falla, la otra corre igual — y
-la respuesta queda guardada en `logs/YYYY-MM-DD.txt`.
+la respuesta queda guardada en `logs/YYYY-MM-DD.txt` junto con la cabecera
+(fecha, hora UTC, modelo, tipo de auth) y el mensaje enviado.
 
 ## Estructura
 
@@ -97,8 +98,21 @@ Para que Actions pueda hacer commit del log generado:
 - **Trigger manual:** `workflow_dispatch` permite ejecuciones on-demand.
 - **Autenticación:** el CLI usa `CLAUDE_CODE_OAUTH_TOKEN` como env var y el
   uso descuenta de tu cuota de Pro, no de saldo de API.
+- **Modelo:** `claude-haiku-4-5-20251001` (configurado via `CLAUDE_MODEL` en
+  el workflow). Se elige Haiku porque es el modelo más barato en cupo de Pro
+  para un mensaje tan trivial como un `.`.
 - **Aislamiento entre cuentas:** cada cuenta corre en un step separado con
   `continue-on-error: true`. El fallo de una no detiene a la otra.
+- **Aislamiento del CLI:** cada invocación de `claude` corre con:
+  - `--max-turns 1` → una sola respuesta, sin loop agéntico.
+  - `--disallowedTools` deshabilitando Bash, Edit, Write, Read, Grep, Glob,
+    WebFetch, WebSearch, Task, TodoWrite y NotebookEdit → Claude solo puede
+    responder texto, no puede explorar el repo ni ejecutar comandos.
+  - `CLAUDE_CONFIG_DIR` apuntando a un directorio temporal distinto por
+    cuenta (`mktemp -d`) → no se comparte historial, proyectos ni preferencias
+    entre las dos cuentas.
+  - `cwd=/tmp` al invocar el CLI → no carga `CLAUDE.md`, `.claude/` ni otros
+    archivos de contexto del repo.
 - **Log append:** si el workflow corre varias veces el mismo día, las entradas
   se acumulan en el mismo archivo separadas por una línea de `=`.
 
