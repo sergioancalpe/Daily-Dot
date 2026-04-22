@@ -13,6 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LOG_DIR: logs
+      CLAUDE_MODEL: claude-haiku-4-5-20251001
+      # Disable all tools so Claude just replies with text.
+      # Prevents exploring cwd, reading files, or running bash.
+      CLAUDE_DISALLOWED_TOOLS: Bash,Edit,Write,Read,Grep,Glob,WebFetch,WebSearch,Task,TodoWrite,NotebookEdit
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,8 +34,8 @@ jobs:
         run: |
           DATE=$(date -u +%Y-%m-%d)
           TIME=$(date -u +%H:%M:%S)
-          LOG_FILE="${LOG_DIR}/${DATE}.txt"
-          mkdir -p "${LOG_DIR}"
+          LOG_FILE="${GITHUB_WORKSPACE}/${LOG_DIR}/${DATE}.txt"
+          mkdir -p "${GITHUB_WORKSPACE}/${LOG_DIR}"
 
           if [ -s "${LOG_FILE}" ]; then
             {
@@ -44,10 +48,10 @@ jobs:
           {
             echo "Date: ${DATE}"
             echo "Time: ${TIME} UTC"
+            echo "Model: ${CLAUDE_MODEL}"
             echo "Auth: Claude Pro (OAuth)"
           } >> "${LOG_FILE}"
 
-          echo "date=${DATE}" >> "$GITHUB_OUTPUT"
           echo "log_file=${LOG_FILE}" >> "$GITHUB_OUTPUT"
 
       - name: Send dot - Account 1
@@ -63,11 +67,16 @@ jobs:
           } >> "${LOG_FILE}"
 
           if [ -z "${CLAUDE_CODE_OAUTH_TOKEN}" ]; then
-            echo "Error: CLAUDE_CODE_OAUTH_TOKEN_1 is not set" | tee -a "${LOG_FILE}"
+            echo "Skipped: CLAUDE_CODE_OAUTH_TOKEN_1 is not set" | tee -a "${LOG_FILE}"
             exit 0
           fi
 
-          if response=$(claude -p "." 2>&1); then
+          # Run from /tmp (neutral dir) so Claude does not load repo context.
+          if response=$(cd /tmp && claude -p "." \
+              --model "${CLAUDE_MODEL}" \
+              --max-turns 1 \
+              --disallowedTools "${CLAUDE_DISALLOWED_TOOLS}" \
+              2>&1); then
             echo "Response: ${response}" | tee -a "${LOG_FILE}"
           else
             code=$?
@@ -91,7 +100,11 @@ jobs:
             exit 0
           fi
 
-          if response=$(claude -p "." 2>&1); then
+          if response=$(cd /tmp && claude -p "." \
+              --model "${CLAUDE_MODEL}" \
+              --max-turns 1 \
+              --disallowedTools "${CLAUDE_DISALLOWED_TOOLS}" \
+              2>&1); then
             echo "Response: ${response}" | tee -a "${LOG_FILE}"
           else
             code=$?
