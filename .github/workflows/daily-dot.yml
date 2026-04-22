@@ -11,25 +11,92 @@ permissions:
 jobs:
   send-dot:
     runs-on: ubuntu-latest
+    env:
+      LOG_DIR: logs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
+          node-version: '20'
 
-      - name: Install dependencies
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Prepare log header
+        id: prep
         run: |
-          python -m pip install --upgrade pip
-          pip install anthropic
+          DATE=$(date -u +%Y-%m-%d)
+          TIME=$(date -u +%H:%M:%S)
+          LOG_FILE="${LOG_DIR}/${DATE}.txt"
+          mkdir -p "${LOG_DIR}"
 
-      - name: Send dot to Anthropic API
+          if [ -s "${LOG_FILE}" ]; then
+            {
+              echo ""
+              echo "============================================================"
+              echo ""
+            } >> "${LOG_FILE}"
+          fi
+
+          {
+            echo "Date: ${DATE}"
+            echo "Time: ${TIME} UTC"
+            echo "Auth: Claude Pro (OAuth)"
+          } >> "${LOG_FILE}"
+
+          echo "date=${DATE}" >> "$GITHUB_OUTPUT"
+          echo "log_file=${LOG_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Send dot - Account 1
+        continue-on-error: true
         env:
-          ANTHROPIC_API_KEY_1: ${{ secrets.ANTHROPIC_API_KEY_1 }}
-          ANTHROPIC_API_KEY_2: ${{ secrets.ANTHROPIC_API_KEY_2 }}
-        run: python scripts/send_dot.py
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_1 }}
+          LOG_FILE: ${{ steps.prep.outputs.log_file }}
+        run: |
+          {
+            echo ""
+            echo "--- Account 1 ---"
+            echo "Message sent: ."
+          } >> "${LOG_FILE}"
+
+          if [ -z "${CLAUDE_CODE_OAUTH_TOKEN}" ]; then
+            echo "Error: CLAUDE_CODE_OAUTH_TOKEN_1 is not set" | tee -a "${LOG_FILE}"
+            exit 0
+          fi
+
+          if response=$(claude -p "." 2>&1); then
+            echo "Response: ${response}" | tee -a "${LOG_FILE}"
+          else
+            code=$?
+            echo "Error (exit ${code}): ${response}" | tee -a "${LOG_FILE}"
+          fi
+
+      - name: Send dot - Account 2
+        continue-on-error: true
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_2 }}
+          LOG_FILE: ${{ steps.prep.outputs.log_file }}
+        run: |
+          {
+            echo ""
+            echo "--- Account 2 ---"
+            echo "Message sent: ."
+          } >> "${LOG_FILE}"
+
+          if [ -z "${CLAUDE_CODE_OAUTH_TOKEN}" ]; then
+            echo "Skipped: CLAUDE_CODE_OAUTH_TOKEN_2 is not set" | tee -a "${LOG_FILE}"
+            exit 0
+          fi
+
+          if response=$(claude -p "." 2>&1); then
+            echo "Response: ${response}" | tee -a "${LOG_FILE}"
+          else
+            code=$?
+            echo "Error (exit ${code}): ${response}" | tee -a "${LOG_FILE}"
+          fi
 
       - name: Commit and push log
         run: |
