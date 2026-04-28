@@ -1,14 +1,36 @@
 # daily-dot
 
-Mantiene activa tu cuenta de **Claude Pro** enviando un mensaje `.` automáticamente
-todos los días a las **11:00 UTC** (6:00 AM hora Colombia) usando el CLI de
-Claude Code autenticado con OAuth. El uso cuenta contra tu suscripción Pro,
-**no** contra billing de API.
+**Pre-dispara la session window de 5 horas de Claude Pro** enviando un mensaje
+`.` automáticamente cada día a las **9:00 UTC** (4:00 AM hora Colombia, UTC-5),
+para que los resets de la ventana caigan dentro de tu jornada laboral en vez de
+desperdiciarse mientras duermes.
 
 Soporta hasta dos cuentas Pro en paralelo (una por secret). Cada llamada se
 ejecuta de forma independiente — si una cuenta falla, la otra corre igual — y
 la respuesta queda guardada en `logs/YYYY-MM-DD.txt` junto con la cabecera
 (fecha, hora UTC, modelo, tipo de auth) y el mensaje enviado.
+
+## ¿Por qué?
+
+Claude Pro funciona con una **session window rolling de 5 horas** que arranca
+con el primer mensaje que envías y se resetea exactamente 5 horas después. Si
+abres la ventana cuando empiezas a trabajar (digamos 8 AM), tus resets caen a
+la 1 PM, 6 PM y 11 PM — y los dos últimos se desperdician fuera de horario.
+
+Si en cambio pre-disparas la ventana a las 4 AM con un `.`:
+
+- Mientras duermes, la primera ventana corre y se "quema" (la ibas a desperdiciar igual).
+- A las **9 AM** llega el primer reset → ventana fresca justo cuando empiezas a trabajar.
+- A las **2 PM** llega el segundo reset → otra ventana fresca para la tarde.
+- A las **7 PM** ya estás fuera de horario.
+
+Resultado: dos resets útiles dentro del día laboral en vez de uno solo. Para
+quien usa Claude Code varias horas seguidas, eso se traduce en cupo extra real
+sin pagar más.
+
+> El uso cuenta contra tu suscripción Pro, **no** contra billing de API. El
+> costo de cada llamada (un `.` a Haiku) es marginal, pero sí descuenta una
+> porción mínima de tu weekly limit — ver sección "Notas" más abajo.
 
 ## Estructura
 
@@ -57,7 +79,8 @@ claude setup-token
 ```
 
 `claude setup-token` imprime un token que empieza con `sk-ant-oat01-...`.
-Cópialo — lo necesitarás en el siguiente paso.
+Cópialo — lo necesitarás en el siguiente paso. Es un mecanismo soportado
+oficialmente por Anthropic para usar Claude Code en CI con auth de Pro.
 
 > Si tienes dos cuentas Pro (en dos navegadores o en incógnito), repite
 > `claude setup-token` estando logueado con cada una para obtener dos tokens
@@ -92,9 +115,22 @@ Para que Actions pueda hacer commit del log generado:
    - La salida de los steps *Send dot - Account 1* y *Account 2*.
    - El archivo `logs/YYYY-MM-DD.txt` commiteado automáticamente al repo.
 
+### 6. Ajustar la hora al horario tuyo (opcional)
+
+El cron por defecto (`0 9 * * *` = 9:00 UTC = 4:00 AM Colombia) está pensado
+para alguien que empieza a trabajar a las 9 AM hora Colombia. Si tu horario
+es distinto, calcula:
+
+> **hora del cron (UTC) = (hora de inicio de jornada local) − 5h + offset UTC**
+
+La idea es que la primera ventana se "queme" mientras duermes y el primer
+reset caiga justo al sentarte a trabajar, dándote 5 horas frescas completas.
+
 ## Cómo funciona
 
-- **Cron:** `0 11 * * *` → 11:00 UTC diarios (6:00 AM Colombia, UTC-5).
+- **Cron:** `0 9 * * *` → 9:00 UTC diarios. Disparar 5 horas antes del inicio
+  de jornada hace que la primera ventana se queme mientras duermes y el primer
+  reset coincida con el momento de empezar a trabajar.
 - **Trigger manual:** `workflow_dispatch` permite ejecuciones on-demand.
 - **Autenticación:** el CLI usa `CLAUDE_CODE_OAUTH_TOKEN` como env var y el
   uso descuenta de tu cuota de Pro, no de saldo de API.
@@ -130,14 +166,19 @@ automáticamente).
 
 ## Notas
 
-- **Inactividad:** GitHub desactiva los workflows programados si el repo no
-  recibe commits por 60 días. Como este workflow commitea el log cada día,
-  se mantiene vivo solo.
+- **Workflow autosostenido:** GitHub desactiva los workflows programados si el
+  repo no recibe commits por 60 días. Como este workflow commitea el log cada
+  día, se mantiene vivo solo.
 - **Precisión del cron:** GitHub Actions puede retrasar el cron algunos
-  minutos en horas pico. No es un scheduler de precisión.
+  minutos en horas pico. No es un scheduler de precisión — si el cron se
+  retrasa 10 minutos, tus resets también.
 - **Expiración del token:** los tokens OAuth pueden caducar eventualmente. Si
   el workflow empieza a fallar con errores de auth, regenera con
   `claude setup-token` y actualiza el secret.
-- **Cuotas de Pro:** cada llamada consume una porción mínima de tu cupo de
-  mensajes de Pro (una request por día con un `.` es insignificante), pero
-  comparte el pool con el uso que hagas en claude.ai y Claude Code local.
+- **Weekly limit:** además de la session window de 5 horas, Pro tiene un
+  límite semanal compartido entre todos los modelos. Cada `.` consume una
+  fracción mínima — un mensaje a Haiku es prácticamente gratis — pero el pool
+  se comparte con tu uso en claude.ai y Claude Code local.
+- **No es un keep-alive de la cuenta:** Claude Pro no se desactiva por
+  inactividad. Este workflow no "mantiene viva" la suscripción; solo alinea
+  los resets de la session window con tu horario.
