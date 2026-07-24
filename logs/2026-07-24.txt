@@ -1,0 +1,12 @@
+Date: 2026-07-24
+Time: 10:51:44 UTC
+Model: claude-haiku-4-5-20251001
+Auth: Claude Pro (OAuth)
+
+--- Account 1 ---
+Message sent: .
+Error (exit 1): Your organization has disabled Claude subscription access for Claude Code · Use an Anthropic API key instead, or ask your admin to enable access
+
+--- Account 2 ---
+Message sent: .
+Skipped: CLAUDE_CODE_OAUTH_TOKEN_2 is not set
